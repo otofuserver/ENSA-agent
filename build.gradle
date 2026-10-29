@@ -26,17 +26,6 @@ def mainClassName = 'com.edamame.agent.EdamameAgent'
 def releaseDir = layout.buildDirectory.dir('release')
 def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
 def isLinux = System.getProperty('os.name').toLowerCase().contains('linux')
-def commandExists = { String command ->
-    try {
-        def checker = isWindows
-            ? ['cmd', '/c', "where ${command}"]
-            : ['sh', '-c', "command -v ${command}"]
-        def process = new ProcessBuilder(checker).redirectErrorStream(true).start()
-        return process.waitFor() == 0
-    } catch (Exception ignored) {
-        return false
-    }
-}
 
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
@@ -94,7 +83,6 @@ tasks.register('packageExeInstaller', Exec) {
     description = 'Windows用EXEインストーラを生成します（Windowsのみ）'
     dependsOn tasks.named('prepareReleaseInput')
     workingDir = projectDir
-    onlyIf { isWindows && commandExists('jpackage') }
     commandLine 'jpackage',
         '--type', 'exe',
         '--name', 'EdamameAgent',
@@ -118,7 +106,6 @@ tasks.register('packageDebInstaller', Exec) {
     description = 'Linux用DEBインストーラを生成します（Linuxのみ）'
     dependsOn tasks.named('prepareReleaseInput')
     workingDir = projectDir
-    onlyIf { isLinux && commandExists('jpackage') }
     commandLine 'jpackage',
         '--type', 'deb',
         '--name', 'edamame-agent',
