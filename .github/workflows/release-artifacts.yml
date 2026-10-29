@@ -102,23 +102,11 @@ jobs:
       - name: Build exe installer
         run: .\gradlew.bat clean packageExeInstaller --no-daemon --console=plain
 
-      - name: Normalize exe artifact name
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem -Path "build/release" -Recurse -File -Filter "*.exe" | Select-Object -First 1
-          if ($null -eq $exe) {
-            throw "No .exe file found under build/release"
-          }
-          $target = (Resolve-Path "build/release").Path + "\\EdamameAgent.exe"
-          if ($exe.FullName -ne $target) {
-            Copy-Item -Path $exe.FullName -Destination $target -Force
-          }
-
       - name: Upload exe installer
         uses: actions/upload-artifact@v5
         with:
           name: exe-installer
-          path: build/release/EdamameAgent.exe
+          path: build/release/*.exe
           if-no-files-found: error
 
   create-release:
@@ -140,7 +128,7 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             release-assets/source-and-jar/EdamameAgent-source.zip \
             release-assets/source-and-jar/EdamameAgent.jar \
-            release-assets/deb-installer/EdamameAgent.deb \
-            release-assets/exe-installer/EdamameAgent.exe \
+            release-assets/deb-installer/*.deb \
+            release-assets/exe-installer/*.exe \
             --verify-tag \
             --generate-notes
