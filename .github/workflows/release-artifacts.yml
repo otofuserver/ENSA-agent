@@ -27,6 +27,9 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Build source zip and jar
         run: ./gradlew clean sourceZip prepareReleaseInput --no-daemon --console=plain
 
@@ -58,8 +61,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fakeroot dpkg-dev
 
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Build deb installer
         run: ./gradlew clean packageDebInstaller --no-daemon --console=plain
+
+      - name: Normalize deb artifact name
+        run: |
+          DEB_PATH="$(find build/release -type f -name '*.deb' | head -n 1)"
+          if [ -z "$DEB_PATH" ]; then
+            echo "No .deb file found under build/release"
+            exit 1
+          fi
+          if [ "$(basename "$DEB_PATH")" != "EdamameAgent.deb" ]; then
+            cp "$DEB_PATH" build/release/EdamameAgent.deb
+          fi
 
       - name: Upload deb installer
         uses: actions/upload-artifact@v5
@@ -84,6 +101,18 @@ jobs:
 
       - name: Build exe installer
         run: .\gradlew.bat clean packageExeInstaller --no-daemon --console=plain
+
+      - name: Normalize exe artifact name
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "build/release" -Recurse -File -Filter "*.exe" | Select-Object -First 1
+          if ($null -eq $exe) {
+            throw "No .exe file found under build/release"
+          }
+          $target = (Resolve-Path "build/release").Path + "\\EdamameAgent.exe"
+          if ($exe.FullName -ne $target) {
+            Copy-Item -Path $exe.FullName -Destination $target -Force
+          }
 
       - name: Upload exe installer
         uses: actions/upload-artifact@v5
