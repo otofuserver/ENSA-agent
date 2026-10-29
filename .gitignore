@@ -1,0 +1,22 @@
+# --- 非公開/管理外（GitHub公開しない） ---
+# 要件: documentフォルダは公開しない
+/document/
+
+# 引き継ぎ用の内部資料
+/AI_HANDOVER_AGENT_PROJECT.md
+
+# IDE / OS
+/.idea/
+/.DS_Store
+Thumbs.db
+
+# Gradle/Java build artifacts
+/.gradle/
+/build/
+/out/
+**/bin/
+**/*.class
+
+# 実行時生成ファイル
+edamame-agent-positions.txt
+*.log

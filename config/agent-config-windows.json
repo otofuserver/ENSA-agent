@@ -1,0 +1,39 @@
+{
+  "agent": {
+    "name": "edamame-agent-windows-01",
+    "description": "Edamame Security Agent Instance for Windows"
+  },
+  "edamame": {
+    "host": "localhost",
+    "port": 2591,
+    "protocol": "tcp",
+    "apiKey": "edamame-agent-api-key-2025",
+    "useSSL": false,
+    "description": "Edamame Security Analyzer Container - TCP Communication",
+    "connectionTimeout": 30,
+    "socketKeepAlive": true
+  },
+  "logging": {
+    "servers": [
+      "windows-iis,C:\\inetpub\\logs\\LogFiles\\W3SVC1\\*.log",
+      "nginx-windows,C:\\ProgramData\\Docker\\containers\\*\\nginx-access.log"
+    ],
+    "collectionInterval": 10,
+    "format": "combined",
+    "maxBatchSize": 100,
+    "debugMode": false,
+    "description": "Log collection settings with server mapping"
+  },
+  "defender": {
+    "enabled": true,
+    "checkInterval": 30,
+    "chain": "WINDOWS_FIREWALL_INBOUND",
+    "blockDuration": 3600,
+    "description": "Windows Firewall inbound rule management settings"
+  },
+  "heartbeat": {
+    "interval": 60,
+    "timeout": 30,
+    "description": "Agent health monitoring"
+  }
+}

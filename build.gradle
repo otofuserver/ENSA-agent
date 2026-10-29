@@ -1,0 +1,164 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'com.edamame.agent'
+version = '1.0.1'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.4'
+
+    testImplementation platform('org.junit:junit-bom:5.10.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+def mainClassName = 'com.edamame.agent.EdamameAgent'
+def releaseDir = layout.buildDirectory.dir('release')
+def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
+def isLinux = System.getProperty('os.name').toLowerCase().contains('linux')
+def commandExists = { String command ->
+    try {
+        def checker = isWindows
+            ? ['cmd', '/c', "where ${command}"]
+            : ['sh', '-c', "command -v ${command}"]
+        def process = new ProcessBuilder(checker).redirectErrorStream(true).start()
+        return process.waitFor() == 0
+    } catch (Exception ignored) {
+        return false
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    enabled = false
+}
+
+shadowJar {
+    archiveBaseName = 'EdamameAgent'
+    archiveClassifier = ''
+    archiveVersion = ''
+    manifest {
+        attributes 'Main-Class': mainClassName
+    }
+}
+
+tasks.register('sourceZip', Zip) {
+    group = 'distribution'
+    description = 'リリース用ソースZIPを生成します'
+    archiveFileName = 'EdamameAgent-source.zip'
+    destinationDirectory = releaseDir
+
+    from(projectDir) {
+        include 'src/**'
+        include 'config/**'
+        include '.github/**'
+        include 'gradle/**'
+        include 'gradlew'
+        include 'gradlew.bat'
+        include 'build.gradle'
+        include 'settings.gradle'
+        include 'README.md'
+        include '.gitignore'
+        exclude 'document/**'
+    }
+}
+
+tasks.register('prepareReleaseInput', Copy) {
+    group = 'distribution'
+    description = 'インストーラ生成用入力JARを準備します'
+    dependsOn tasks.named('shadowJar')
+    from(tasks.named('shadowJar'))
+    into(releaseDir)
+    rename { 'EdamameAgent.jar' }
+}
+
+tasks.register('packageExeInstaller', Exec) {
+    group = 'distribution'
+    description = 'Windows用EXEインストーラを生成します（Windowsのみ）'
+    dependsOn tasks.named('prepareReleaseInput')
+    workingDir = projectDir
+    onlyIf { isWindows && commandExists('jpackage') }
+    commandLine 'jpackage',
+        '--type', 'exe',
+        '--name', 'EdamameAgent',
+        '--input', releaseDir.get().asFile.absolutePath,
+        '--main-jar', 'EdamameAgent.jar',
+        '--main-class', mainClassName,
+        '--dest', releaseDir.get().asFile.absolutePath,
+        '--vendor', 'Edamame Security'
+    doLast {
+        def exe = releaseDir.get().asFile.listFiles()?.find {
+            it.name.toLowerCase().endsWith('.exe') && it.name != 'EdamameAgent.exe'
+        }
+        if (exe != null) {
+            exe.renameTo(new File(exe.parentFile, 'EdamameAgent.exe'))
+        }
+    }
+}
+
+tasks.register('packageDebInstaller', Exec) {
+    group = 'distribution'
+    description = 'Linux用DEBインストーラを生成します（Linuxのみ）'
+    dependsOn tasks.named('prepareReleaseInput')
+    workingDir = projectDir
+    onlyIf { isLinux && commandExists('jpackage') }
+    commandLine 'jpackage',
+        '--type', 'deb',
+        '--name', 'edamame-agent',
+        '--input', releaseDir.get().asFile.absolutePath,
+        '--main-jar', 'EdamameAgent.jar',
+        '--main-class', mainClassName,
+        '--dest', releaseDir.get().asFile.absolutePath,
+        '--vendor', 'Edamame Security'
+    doLast {
+        def deb = releaseDir.get().asFile.listFiles()?.find {
+            it.name.toLowerCase().endsWith('.deb') && it.name != 'EdamameAgent.deb'
+        }
+        if (deb != null) {
+            deb.renameTo(new File(deb.parentFile, 'EdamameAgent.deb'))
+        }
+    }
+}
+
+tasks.register('releaseArtifacts') {
+    group = 'distribution'
+    description = 'リリース配布物（source.zip / jar / deb / exe）を生成します'
+    dependsOn tasks.named('sourceZip')
+    dependsOn tasks.named('prepareReleaseInput')
+    if (isWindows) {
+        dependsOn tasks.named('packageExeInstaller')
+    }
+    if (isLinux) {
+        dependsOn tasks.named('packageDebInstaller')
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('shadowJar')
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}
+
+tasks.named('wrapper') {
+    gradleVersion = '8.10.2'
+    distributionType = Wrapper.DistributionType.BIN
+}

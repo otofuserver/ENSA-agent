@@ -1,0 +1,39 @@
+{
+  "agent": {
+    "name": "edamame-agent-01",
+    "description": "Edamame Security Agent Instance 01"
+  },
+  "edamame": {
+    "host": "localhost",
+    "port": 2591,
+    "protocol": "tcp",
+    "apiKey": "edamame-agent-api-key-2025",
+    "useSSL": false,
+    "description": "Edamame Security Analyzer Container - TCP Communication",
+    "connectionTimeout": 30,
+    "socketKeepAlive": true
+  },
+  "logging": {
+    "servers": [
+      "main-nginx,/var/log/nginx/access.log",
+      "main-nginx,/var/log/nginx/error.log"
+    ],
+    "collectionInterval": 10,
+    "format": "combined",
+    "maxBatchSize": 100,
+    "debugMode": true,
+    "description": "Log collection settings with server mapping"
+  },
+  "iptables": {
+    "enabled": true,
+    "checkInterval": 30,
+    "chain": "INPUT",
+    "blockDuration": 3600,
+    "description": "Firewall management settings"
+  },
+  "heartbeat": {
+    "interval": 60,
+    "timeout": 30,
+    "description": "Agent health monitoring"
+  }
+}
