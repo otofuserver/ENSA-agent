@@ -82,9 +82,3 @@ cd ENSA-agent
 - `EdamameAgent.exe`
 - `EdamameAgent.jar`
 
-### リリース生成（GitHub Actions）
-- ワークフロー: `.github/workflows/release-artifacts.yml`
-- 実行トリガー:
-  - 手動実行（`workflow_dispatch`）
-  - タグPush（`v*`）
-- タグ実行時は GitHub Release に成果物を自動添付
