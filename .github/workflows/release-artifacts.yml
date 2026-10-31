@@ -34,7 +34,7 @@ jobs:
         run: ./gradlew clean prepareReleaseInput --no-daemon --console=plain
 
       - name: Upload jar
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: jar-asset
           path: |
@@ -78,7 +78,7 @@ jobs:
           fi
 
       - name: Upload deb installer
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: deb-installer
           path: build/release/EdamameAgent.deb
@@ -102,7 +102,7 @@ jobs:
         run: .\gradlew.bat clean packageExeInstaller --no-daemon --console=plain
 
       - name: Upload exe installer
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: exe-installer
           path: build/release/*.exe
@@ -121,7 +121,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
 
