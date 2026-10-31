@@ -16,6 +16,18 @@ NGINXログを収集し、Edamameサーバーへ送信するセキュリティ�
 ## インストール方法（予定）
 - [インストール手順（準備中）](#)
 
+### Linux版インストール（.deb）
+```bash
+# 1) パッケージをインストール
+sudo apt install ./EdamameAgent.deb
+
+# 2) 登録されたサービスを確認（初期状態: 停止・無効）
+sudo systemctl status edamame-agent
+
+# 3) 設定ファイルを編集
+sudo nano /etc/Edamame/agent/agent-config.json
+```
+
 ### 起動方法（Linux / systemd）
 ```bash
 # 起動（手動）
