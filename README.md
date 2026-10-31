@@ -16,6 +16,23 @@ NGINXログを収集し、Edamameサーバーへ送信するセキュリティ�
 ## インストール方法（予定）
 - [インストール手順（準備中）](#)
 
+### 起動方法（Linux / systemd）
+```bash
+# 起動（手動）
+sudo systemctl start edamame-agent
+
+# 停止（手動）
+sudo systemctl stop edamame-agent
+
+# 状態確認
+sudo systemctl status edamame-agent
+
+# 自動起動を有効化する場合
+sudo systemctl enable edamame-agent
+```
+
+初期状態は停止・無効です。
+
 ## 設定リンク（予定）
 - [設定ガイド（準備中）](#)
 - [ModSecurity連携設定（準備中）](#)
@@ -75,9 +92,3 @@ cd ENSA-agent
 
 ### ビルド成果物
 - `build\libs\EdamameAgent.jar`（実行可能JAR）
-
-### リリース配布物
-- `EdamameAgent.deb`
-- `EdamameAgent.exe`
-- `EdamameAgent.jar`
-

@@ -1,0 +1,87 @@
+#!/bin/sh
+set -eu
+
+CONFIG_DIR="/etc/Edamame/agent"
+CONFIG_FILE="${CONFIG_DIR}/agent-config.json"
+SERVICE_FILE="/etc/systemd/system/edamame-agent.service"
+
+mkdir -p "${CONFIG_DIR}"
+chmod 755 "${CONFIG_DIR}"
+
+if [ ! -f "${CONFIG_FILE}" ]; then
+  cat <<'EOF' > "${CONFIG_FILE}"
+{
+  "agent": {
+    "name": "edamame-agent-01",
+    "description": "Edamame Security Agent Instance 01"
+  },
+  "edamame": {
+    "host": "localhost",
+    "port": 2591,
+    "protocol": "tcp",
+    "apiKey": "edamame-agent-api-key-2025",
+    "useSSL": false,
+    "description": "Edamame Security Analyzer Container - TCP Communication",
+    "connectionTimeout": 30,
+    "socketKeepAlive": true
+  },
+  "logging": {
+    "servers": [
+      "main-nginx,/var/log/nginx/access.log",
+      "main-nginx,/var/log/nginx/error.log"
+    ],
+    "collectionInterval": 10,
+    "format": "combined",
+    "maxBatchSize": 100,
+    "debugMode": true,
+    "description": "Log collection settings with server mapping"
+  },
+  "iptables": {
+    "enabled": true,
+    "checkInterval": 30,
+    "chain": "INPUT",
+    "blockDuration": 3600,
+    "description": "Firewall management settings"
+  },
+  "heartbeat": {
+    "interval": 60,
+    "timeout": 30,
+    "description": "Agent health monitoring"
+  }
+}
+EOF
+  chmod 600 "${CONFIG_FILE}"
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  LAUNCHER_PATH=""
+  if command -v edamame-agent >/dev/null 2>&1; then
+    LAUNCHER_PATH="$(command -v edamame-agent)"
+  elif [ -x "/opt/edamame-agent/bin/edamame-agent" ]; then
+    LAUNCHER_PATH="/opt/edamame-agent/bin/edamame-agent"
+  elif [ -x "/opt/edamame-agent/bin/EdamameAgent" ]; then
+    LAUNCHER_PATH="/opt/edamame-agent/bin/EdamameAgent"
+  else
+    LAUNCHER_PATH="edamame-agent"
+  fi
+
+  cat <<EOF > "${SERVICE_FILE}"
+[Unit]
+Description=Edamame Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${LAUNCHER_PATH} --config ${CONFIG_FILE}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  chmod 644 "${SERVICE_FILE}"
+  systemctl daemon-reload
+  systemctl disable --now edamame-agent.service >/dev/null 2>&1 || true
+fi

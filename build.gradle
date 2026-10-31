@@ -24,6 +24,7 @@ dependencies {
 }
 def mainClassName = 'com.edamame.agent.EdamameAgent'
 def releaseDir = layout.buildDirectory.dir('release')
+def linuxPackagingResourceDir = file('packaging/linux/jpackage')
 def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
 def isLinux = System.getProperty('os.name').toLowerCase().contains('linux')
 
@@ -95,6 +96,7 @@ tasks.register('packageExeInstaller', Exec) {
     commandLine 'jpackage',
         '--type', 'exe',
         '--name', 'EdamameAgent',
+        '--app-version', project.version.toString(),
         '--input', releaseDir.get().asFile.absolutePath,
         '--main-jar', 'EdamameAgent.jar',
         '--main-class', mainClassName,
@@ -118,6 +120,8 @@ tasks.register('packageDebInstaller', Exec) {
     commandLine 'jpackage',
         '--type', 'deb',
         '--name', 'edamame-agent',
+        '--app-version', project.version.toString(),
+        '--resource-dir', linuxPackagingResourceDir.absolutePath,
         '--input', releaseDir.get().asFile.absolutePath,
         '--main-jar', 'EdamameAgent.jar',
         '--main-class', mainClassName,
