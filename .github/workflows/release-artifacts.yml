@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  source-and-jar:
+  jar-asset:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,15 +30,14 @@ jobs:
       - name: Ensure gradlew is executable
         run: chmod +x ./gradlew
 
-      - name: Build source zip and jar
-        run: ./gradlew clean sourceZip prepareReleaseInput --no-daemon --console=plain
+      - name: Build jar
+        run: ./gradlew clean prepareReleaseInput --no-daemon --console=plain
 
-      - name: Upload source zip and jar
+      - name: Upload jar
         uses: actions/upload-artifact@v5
         with:
-          name: source-and-jar
+          name: jar-asset
           path: |
-            build/release/EdamameAgent-source.zip
             build/release/EdamameAgent.jar
           if-no-files-found: error
 
@@ -111,7 +110,7 @@ jobs:
 
   create-release:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [source-and-jar, deb-installer, exe-installer]
+    needs: [jar-asset, deb-installer, exe-installer]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -131,8 +130,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ github.ref_name }}" \
-            release-assets/source-and-jar/EdamameAgent-source.zip \
-            release-assets/source-and-jar/EdamameAgent.jar \
+            release-assets/jar-asset/EdamameAgent.jar \
             release-assets/deb-installer/*.deb \
             release-assets/exe-installer/*.exe \
             --verify-tag \

@@ -77,7 +77,6 @@ cd ENSA-agent
 - `build\libs\EdamameAgent.jar`（実行可能JAR）
 
 ### リリース配布物
-- `EdamameAgent-source.zip`
 - `EdamameAgent.deb`
 - `EdamameAgent.exe`
 - `EdamameAgent.jar`
