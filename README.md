@@ -10,7 +10,7 @@ NGINXログを収集し、Edamameサーバーへ送信するセキュリティ�
 
 
 ## 動作環境（使用のみ）
-- Java 21+
+- Java 17 / 21 / 25（17以上）
 - Linux / Windows
 
 ## インストール方法（予定）
@@ -51,13 +51,13 @@ sudo systemctl enable edamame-agent
 ## 自分でbuildしたい人向けの情報
 
 ### 必要な環境
-- JDK 21（`java -version` / `javac -version` で確認）
+- JDK 17+（推奨: 17 / 21 / 25、`java -version` / `javac -version` で確認）
 - Git
 - インターネット接続（初回Gradle依存取得時）
 
 ### 環境構築（Windows）
 ```powershell
-# 1) JDK 21 をインストール
+# 1) JDK 17+（推奨: 17 / 21 / 25）をインストール
 # 2) Git for Windows をインストール
 # 3) 確認
 java -version
@@ -67,9 +67,9 @@ git --version
 
 ### 環境構築（Linux）
 ```bash
-# 1) JDK 21 をインストール（例: Ubuntu）
+# 1) JDK 17+ をインストール（例: Ubuntu）
 sudo apt update
-sudo apt install -y openjdk-21-jdk git
+sudo apt install -y openjdk-17-jdk git
 # 2) 確認
 java -version
 javac -version
