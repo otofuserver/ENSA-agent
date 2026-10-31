@@ -7,7 +7,7 @@ package com.edamame.agent.network;
  * 共通使用するプロトコル定数を定義
  *
  * @author Edamame Team
- * @version 1.0.0
+ * @version build.gradle の version を参照
  */
 public final class TcpProtocolConstants {
 

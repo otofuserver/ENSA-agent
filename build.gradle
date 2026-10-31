@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.edamame.agent'
-version = '1.0.0'
+version = '1.0.1'
 
 java {
     toolchain {
@@ -35,6 +35,12 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.named('processResources') {
+    filesMatching('agent-version.properties') {
+        expand(version: project.version)
+    }
+}
+
 jar {
     enabled = false
 }
@@ -44,7 +50,10 @@ shadowJar {
     archiveClassifier = ''
     archiveVersion = ''
     manifest {
-        attributes 'Main-Class': mainClassName
+        attributes(
+            'Main-Class': mainClassName,
+            'Implementation-Version': project.version
+        )
     }
 }
 

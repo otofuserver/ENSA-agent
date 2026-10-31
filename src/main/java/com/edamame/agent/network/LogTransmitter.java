@@ -3,6 +3,7 @@ package com.edamame.agent.network;
 import com.edamame.agent.config.AgentConfig;
 import com.edamame.agent.log.LogEntry;
 import com.edamame.agent.util.AgentLogger;
+import com.edamame.agent.util.AgentVersion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import static com.edamame.agent.network.TcpProtocolConstants.*;
@@ -726,7 +727,7 @@ public class LogTransmitter {
             registrationData.put("javaVersion", System.getProperty("java.version", "Unknown"));
             registrationData.put("nginxLogPaths", config.getNginxLogPaths());
             registrationData.put("iptablesEnabled", config.isEnableIptables());
-            registrationData.put("agentVersion", "1.0.0");
+            registrationData.put("agentVersion", AgentVersion.get());
             registrationData.put("timestamp", System.currentTimeMillis());
 
             String jsonData = objectMapper.writeValueAsString(registrationData);

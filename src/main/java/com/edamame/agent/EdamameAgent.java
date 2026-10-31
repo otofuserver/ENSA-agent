@@ -5,6 +5,7 @@ import com.edamame.agent.log.LogCollector;
 import com.edamame.agent.network.LogTransmitter;
 import com.edamame.agent.system.IptablesManager;
 import com.edamame.agent.util.AgentLogger;
+import com.edamame.agent.util.AgentVersion;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -20,11 +21,11 @@ import java.util.concurrent.TimeUnit;
  * Java 11-21対応
  *
  * @author Edamame Team
- * @version 1.0.0
+ * @version build.gradle の version を参照
  */
 public class EdamameAgent {
 
-    private static final String AGENT_VERSION = "1.0.0";
+    private static final String AGENT_VERSION = AgentVersion.get();
     private static final String LINUX_SYSTEM_CONFIG_PATH = "/etc/Edamame/agent/agent-config.json";
 
     private final AgentConfig config;

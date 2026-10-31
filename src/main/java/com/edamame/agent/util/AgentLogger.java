@@ -9,7 +9,7 @@ import java.time.format.DateTimeFormatter;
  * フォーマット: [yyyy-MM-dd HH:mm:ss][レベル] メッセージ
  *
  * @author Edamame Team
- * @version 1.0.0
+ * @version build.gradle の version を参照
  */
 public class AgentLogger {
 

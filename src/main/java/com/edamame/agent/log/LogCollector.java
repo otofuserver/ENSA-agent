@@ -22,7 +22,7 @@ import java.util.regex.Matcher;
  * 新しいログエントリを収集する
  *
  * @author Edamame Team
- * @version 1.0.0
+ * @version build.gradle の version を参照
  */
 public class LogCollector {
 
