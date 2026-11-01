@@ -7,6 +7,8 @@ import com.edamame.agent.system.IptablesManager;
 import com.edamame.agent.util.AgentLogger;
 import com.edamame.agent.util.AgentVersion;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -37,6 +39,8 @@ public class EdamameAgent {
     private static final String WINDOWS_RELOAD_COMMAND_PATH = "Edamame\\agent\\reload.signal";
     private static final String WINDOWS_COMMAND_DIR = "Edamame\\agent\\bin";
     private static final String WINDOWS_COMMAND_FILE_NAME = "ensaa.cmd";
+    private static final String WINDOWS_SERVICE_NAME = "EdamameAgent";
+    private static final String WINDOWS_SERVICE_DISPLAY_NAME = "Edamame Agent";
     private static final String LINUX_RELOAD_COMMAND_PATH = "/tmp/edamame-agent.reload";
 
     private final AgentConfig config;
@@ -57,7 +61,12 @@ public class EdamameAgent {
     private enum StartupCommand {
         START,
         TEST,
-        RELOAD
+        RELOAD,
+        SERVICE_INSTALL,
+        SERVICE_UNINSTALL,
+        SERVICE_START,
+        SERVICE_STOP,
+        SERVICE_STATUS
     }
 
     private record StartupOptions(String configPath, StartupCommand command, boolean showHelp, boolean showVersion, String errorMessage) {}
@@ -452,6 +461,26 @@ public class EdamameAgent {
                 command = StartupCommand.RELOAD;
                 continue;
             }
+            if ("--service-install".equals(arg)) {
+                command = StartupCommand.SERVICE_INSTALL;
+                continue;
+            }
+            if ("--service-uninstall".equals(arg)) {
+                command = StartupCommand.SERVICE_UNINSTALL;
+                continue;
+            }
+            if ("--service-start".equals(arg)) {
+                command = StartupCommand.SERVICE_START;
+                continue;
+            }
+            if ("--service-stop".equals(arg)) {
+                command = StartupCommand.SERVICE_STOP;
+                continue;
+            }
+            if ("--service-status".equals(arg)) {
+                command = StartupCommand.SERVICE_STATUS;
+                continue;
+            }
 
             if ("-c".equals(arg) || "--config".equals(arg)) {
                 if (i + 1 >= args.length) {
@@ -497,6 +526,11 @@ public class EdamameAgent {
         System.out.println("      --config=<path>   設定ファイルパスを指定");
         System.out.println("  -T, --test            設定書式チェックとエラー診断を実行して終了");
         System.out.println("  -R, --reload          実行中エージェントへ設定リロードを要求して終了");
+        System.out.println("      --service-install   Windowsサービスを登録（NSSM必須）");
+        System.out.println("      --service-uninstall Windowsサービス登録を解除");
+        System.out.println("      --service-start     Windowsサービスを起動");
+        System.out.println("      --service-stop      Windowsサービスを停止");
+        System.out.println("      --service-status    Windowsサービス状態を表示");
         System.out.println("  -v, --version         バージョンのみ表示");
         System.out.println("  -h, --help            このヘルプを表示");
         System.out.println("  [設定ファイルパス]     既存互換の位置引数（先頭1つ）");
@@ -581,6 +615,118 @@ public class EdamameAgent {
     }
 
     /**
+     * Windowsサービスを操作する
+     */
+    private static boolean manageWindowsService(StartupCommand command, String configPath) {
+        if (!System.getProperty("os.name", "unknown").toLowerCase().contains("win")) {
+            AgentLogger.error("Windowsサービス操作はWindows環境でのみ利用できます");
+            return false;
+        }
+
+        try {
+            if (command == StartupCommand.SERVICE_INSTALL) {
+                return installWindowsService(configPath);
+            }
+            if (command == StartupCommand.SERVICE_UNINSTALL) {
+                return runCommand(List.of("nssm", "remove", WINDOWS_SERVICE_NAME, "confirm"), "サービス登録解除");
+            }
+            if (command == StartupCommand.SERVICE_START) {
+                return runCommand(List.of("sc", "start", WINDOWS_SERVICE_NAME), "サービス起動");
+            }
+            if (command == StartupCommand.SERVICE_STOP) {
+                return runCommand(List.of("sc", "stop", WINDOWS_SERVICE_NAME), "サービス停止");
+            }
+            if (command == StartupCommand.SERVICE_STATUS) {
+                return runCommand(List.of("sc", "query", WINDOWS_SERVICE_NAME), "サービス状態確認");
+            }
+            AgentLogger.error("未対応のサービス操作コマンドです: " + command);
+            return false;
+        } catch (Exception e) {
+            AgentLogger.error("Windowsサービス操作に失敗しました: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Windowsサービスを登録する
+     */
+    private static boolean installWindowsService(String configPath) {
+        Path launcher = resolveWindowsLauncherPath();
+        if (launcher == null) {
+            AgentLogger.error("サービス登録に失敗しました: ランチャーが見つかりません");
+            return false;
+        }
+
+        Path appDirectory = launcher.getParent();
+        String resolvedConfigPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
+
+        if (!runCommand(
+            List.of("nssm", "install", WINDOWS_SERVICE_NAME, launcher.toString(), "--config", resolvedConfigPath),
+            "サービス登録"
+        )) {
+            return false;
+        }
+
+        boolean displayNameOk = runCommand(
+            List.of("nssm", "set", WINDOWS_SERVICE_NAME, "DisplayName", WINDOWS_SERVICE_DISPLAY_NAME),
+            "サービス表示名設定"
+        );
+        boolean appDirectoryOk = true;
+        if (appDirectory != null) {
+            appDirectoryOk = runCommand(
+                List.of("nssm", "set", WINDOWS_SERVICE_NAME, "AppDirectory", appDirectory.toString()),
+                "サービス作業ディレクトリ設定"
+            );
+        }
+        boolean startModeOk = runCommand(
+            List.of("nssm", "set", WINDOWS_SERVICE_NAME, "Start", "SERVICE_DEMAND_START"),
+            "サービス起動モード設定"
+        );
+
+        if (!displayNameOk || !appDirectoryOk || !startModeOk) {
+            AgentLogger.warn("サービス登録は完了しましたが、一部プロパティ設定に失敗しました");
+            return false;
+        }
+
+        AgentLogger.info("Windowsサービスを登録しました（初期状態: 手動起動）");
+        return true;
+    }
+
+    /**
+     * 外部コマンドを実行して結果をログ出力する
+     */
+    private static boolean runCommand(List<String> command, String commandLabel) {
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.redirectErrorStream(true);
+        try {
+            Process process = processBuilder.start();
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append(System.lineSeparator());
+                }
+            }
+            int exitCode = process.waitFor();
+            if (exitCode == 0) {
+                AgentLogger.info(commandLabel + "に成功しました");
+                if (!output.isEmpty()) {
+                    AgentLogger.info(output.toString().trim());
+                }
+                return true;
+            }
+            AgentLogger.error(commandLabel + "に失敗しました (exitCode=" + exitCode + ")");
+            if (!output.isEmpty()) {
+                AgentLogger.error(output.toString().trim());
+            }
+            return false;
+        } catch (Exception e) {
+            AgentLogger.error(commandLabel + "実行中に例外が発生しました: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * メインエントリーポイント
      */
     public static void main(String[] args) {
@@ -620,6 +766,31 @@ public class EdamameAgent {
         }
         if (startupOptions.command() == StartupCommand.RELOAD) {
             boolean ok = triggerReloadCommand(isWindows);
+            System.exit(ok ? 0 : 1);
+            return;
+        }
+        if (startupOptions.command() == StartupCommand.SERVICE_INSTALL) {
+            boolean ok = manageWindowsService(StartupCommand.SERVICE_INSTALL, configPath);
+            System.exit(ok ? 0 : 1);
+            return;
+        }
+        if (startupOptions.command() == StartupCommand.SERVICE_UNINSTALL) {
+            boolean ok = manageWindowsService(StartupCommand.SERVICE_UNINSTALL, configPath);
+            System.exit(ok ? 0 : 1);
+            return;
+        }
+        if (startupOptions.command() == StartupCommand.SERVICE_START) {
+            boolean ok = manageWindowsService(StartupCommand.SERVICE_START, configPath);
+            System.exit(ok ? 0 : 1);
+            return;
+        }
+        if (startupOptions.command() == StartupCommand.SERVICE_STOP) {
+            boolean ok = manageWindowsService(StartupCommand.SERVICE_STOP, configPath);
+            System.exit(ok ? 0 : 1);
+            return;
+        }
+        if (startupOptions.command() == StartupCommand.SERVICE_STATUS) {
+            boolean ok = manageWindowsService(StartupCommand.SERVICE_STATUS, configPath);
             System.exit(ok ? 0 : 1);
             return;
         }

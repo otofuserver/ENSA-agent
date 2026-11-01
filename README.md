@@ -37,6 +37,7 @@ ensaa --help
 - インストール済み環境で再実行するとメンテナンスモードになり、修復または削除を選択できます。
 - 初回起動時に Windows 設定テンプレートを `C:\ProgramData\Edamame\agent\agent-config.json` へ自動配置します。
 - 初回起動時に `ensaa` コマンドをセットアップし、PATHへ自動追加します（反映後は新しいターミナルで利用可能）。
+- Windowsサービス化は `ensaa --service-install` で登録できます（NSSMが必要、初期状態は手動起動）。
 
 ### 起動方法（Linux / systemd）
 ```bash
@@ -58,6 +59,24 @@ sudo systemctl enable edamame-agent
 
 初期状態は停止・無効です。
 
+### 起動方法（Windows / サービス）
+```powershell
+# 1) サービス登録（初回のみ、管理者PowerShell）
+ensaa --service-install --config "C:\ProgramData\Edamame\agent\agent-config.json"
+
+# 2) サービス起動
+ensaa --service-start
+
+# 3) サービス状態確認
+ensaa --service-status
+
+# 4) 設定リロード（プロセス再起動なし）
+ensaa --reload
+
+# 5) サービス停止
+ensaa --service-stop
+```
+
 ## 設定リンク（予定）
 - [設定ガイド（準備中）](#)
 - [ModSecurity連携設定（準備中）](#)
@@ -67,7 +86,7 @@ sudo systemctl enable edamame-agent
 - `config\agent-config-windows.json`（Windows向け）
 
 
-## コマンド一覧
+## コマンド一覧（共通）
 ```bash
 # バージョン表示
 ensaa --version
@@ -83,7 +102,28 @@ ensaa -T --config /etc/Edamame/agent/agent-config.json
 
 # 実行中エージェントへ設定リロード要求（Windows / Linux 共通）
 ensaa --reload
+```
 
+## コマンド一覧（Windowsサービス）
+```powershell
+# Windowsサービス登録（NSSM必須）
+ensaa --service-install --config "C:\ProgramData\Edamame\agent\agent-config.json"
+
+# Windowsサービス起動
+ensaa --service-start
+
+# Windowsサービス停止
+ensaa --service-stop
+
+# Windowsサービス状態確認
+ensaa --service-status
+
+# Windowsサービス登録解除
+ensaa --service-uninstall
+```
+
+## コマンド一覧（Linux systemd）
+```bash
 # サービス状態確認
 sudo systemctl status edamame-agent
 
@@ -97,7 +137,6 @@ sudo systemctl reload edamame-agent
 sudo systemctl stop edamame-agent
 ```
 
-Windows でも同じく `ensaa -T` / `ensaa --reload` / `ensaa --help` を利用できます。
 
 
 
