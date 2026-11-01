@@ -27,6 +27,9 @@ public class EdamameAgent {
 
     private static final String AGENT_VERSION = AgentVersion.get();
     private static final String LINUX_SYSTEM_CONFIG_PATH = "/etc/Edamame/agent/agent-config.json";
+    private static final String WINDOWS_PROGRAM_DATA_DIR = "ProgramData";
+    private static final String WINDOWS_FALLBACK_PROGRAM_DATA_PATH = "C:\\ProgramData";
+    private static final String WINDOWS_SYSTEM_CONFIG_PATH = "Edamame\\agent\\agent-config.json";
 
     private final AgentConfig config;
     private final ScheduledExecutorService executor;
@@ -319,7 +322,7 @@ public class EdamameAgent {
     public static void main(String[] args) {
         String osName = System.getProperty("os.name", "unknown");
         boolean isWindows = osName.toLowerCase().contains("win");
-        String defaultConfigPath = isWindows ? "agent-config-windows.json" : "agent-config.json";
+        String defaultConfigPath = isWindows ? resolveWindowsSystemConfigPath() : "agent-config.json";
         if (!isWindows && Files.exists(Paths.get(LINUX_SYSTEM_CONFIG_PATH))) {
             defaultConfigPath = LINUX_SYSTEM_CONFIG_PATH;
         }
@@ -363,5 +366,16 @@ public class EdamameAgent {
             AgentLogger.info("メインスレッドが中断されました");
             agent.stop();
         }
+    }
+
+    /**
+     * Windows用のシステム設定ファイルパスを解決する
+     */
+    private static String resolveWindowsSystemConfigPath() {
+        String programDataPath = System.getenv(WINDOWS_PROGRAM_DATA_DIR);
+        if (programDataPath == null || programDataPath.isBlank()) {
+            programDataPath = WINDOWS_FALLBACK_PROGRAM_DATA_PATH;
+        }
+        return Paths.get(programDataPath, WINDOWS_SYSTEM_CONFIG_PATH).toString();
     }
 }

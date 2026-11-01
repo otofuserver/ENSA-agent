@@ -336,14 +336,9 @@ public class AgentConfig {
             ? buildWindowsDefaultConfig()
             : buildStandardDefaultConfig();
 
-        // Windows環境は従来通り configPath に生成
+        // Windows環境は ProgramData 配下の configPath に生成
         if (isWindowsDefaultProfile()) {
-            try {
-                Files.writeString(Paths.get(configPath), defaultConfig);
-                AgentLogger.info("デフォルト設定ファイルを作成しました: " + configPath);
-            } catch (IOException e) {
-                AgentLogger.error("デフォルト設定ファイルの作成に失敗しました: " + e.getMessage());
-            }
+            createDefaultConfigForWindows(defaultConfig);
             return;
         }
 
@@ -407,6 +402,39 @@ public class AgentConfig {
             this.configPath = currentDirConfig.toString();
         } catch (IOException e) {
             AgentLogger.error("デフォルト設定ファイルの作成に失敗しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Windows環境でデフォルト設定ファイルを生成する
+     *
+     * ProgramData配下のディレクトリが無い場合は作成し、
+     * 作成失敗時のみカレントディレクトリにフォールバックする。
+     *
+     * @param defaultConfig 生成するデフォルト設定のJSON文字列
+     */
+    private void createDefaultConfigForWindows(String defaultConfig) {
+        Path windowsConfig = Paths.get(configPath).toAbsolutePath().normalize();
+        Path parent = windowsConfig.getParent();
+
+        if (parent != null && !Files.isDirectory(parent)) {
+            try {
+                Files.createDirectories(parent);
+                AgentLogger.info("Windows設定ディレクトリを作成しました: " + parent);
+            } catch (IOException e) {
+                AgentLogger.warn("Windows設定ディレクトリの作成に失敗しました: " + e.getMessage() + " → カレントディレクトリに設定ファイルを生成します");
+                createDefaultConfigInCurrentDir(defaultConfig);
+                return;
+            }
+        }
+
+        try {
+            Files.writeString(windowsConfig, defaultConfig);
+            AgentLogger.info("Windowsデフォルト設定ファイルを作成しました: " + windowsConfig);
+            this.configPath = windowsConfig.toString();
+        } catch (IOException e) {
+            AgentLogger.warn("Windowsデフォルト設定ファイルの作成に失敗しました: " + e.getMessage() + " → カレントディレクトリに設定ファイルを生成します");
+            createDefaultConfigInCurrentDir(defaultConfig);
         }
     }
 

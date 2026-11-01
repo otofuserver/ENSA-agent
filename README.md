@@ -28,6 +28,12 @@ sudo systemctl status edamame-agent
 sudo nano /etc/Edamame/agent/agent-config.json
 ```
 
+### Windows版インストール（.exe）
+- 1回目の実行は新規インストールです。
+- インストール先フォルダを選択できます。
+- インストール済み環境で再実行するとメンテナンスモードになり、修復または削除を選択できます。
+- 初回起動時に Windows 設定テンプレートを `C:\ProgramData\Edamame\agent\agent-config.json` へ自動配置します。
+
 ### 起動方法（Linux / systemd）
 ```bash
 # 起動（手動）
