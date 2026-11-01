@@ -36,6 +36,7 @@ ensaa --help
 - インストール先フォルダを選択できます。
 - インストール済み環境で再実行するとメンテナンスモードになり、修復または削除を選択できます。
 - 初回起動時に Windows 設定テンプレートを `C:\ProgramData\Edamame\agent\agent-config.json` へ自動配置します。
+- 初回起動時に `ensaa` コマンドをセットアップし、PATHへ自動追加します（反映後は新しいターミナルで利用可能）。
 
 ### 起動方法（Linux / systemd）
 ```bash
@@ -92,6 +93,8 @@ sudo systemctl reload edamame-agent
 # サービス停止
 sudo systemctl stop edamame-agent
 ```
+
+Windows でも同じく `ensaa -T` / `ensaa --help` を利用できます。
 
 
 

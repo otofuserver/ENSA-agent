@@ -34,6 +34,8 @@ public class EdamameAgent {
     private static final String WINDOWS_PROGRAM_DATA_DIR = "ProgramData";
     private static final String WINDOWS_FALLBACK_PROGRAM_DATA_PATH = "C:\\ProgramData";
     private static final String WINDOWS_SYSTEM_CONFIG_PATH = "Edamame\\agent\\agent-config.json";
+    private static final String WINDOWS_COMMAND_DIR = "Edamame\\agent\\bin";
+    private static final String WINDOWS_COMMAND_FILE_NAME = "ensaa.cmd";
     private static final String LINUX_RELOAD_COMMAND_PATH = "/tmp/edamame-agent.reload";
 
     private final AgentConfig config;
@@ -560,6 +562,9 @@ public class EdamameAgent {
         if (!isWindows && Files.exists(Paths.get(LINUX_SYSTEM_CONFIG_PATH))) {
             defaultConfigPath = LINUX_SYSTEM_CONFIG_PATH;
         }
+        if (isWindows) {
+            setupWindowsCommandAlias();
+        }
 
         StartupOptions startupOptions = parseStartupOptions(args);
         if (startupOptions.showVersion()) {
@@ -616,5 +621,100 @@ public class EdamameAgent {
             programDataPath = WINDOWS_FALLBACK_PROGRAM_DATA_PATH;
         }
         return Paths.get(programDataPath, WINDOWS_SYSTEM_CONFIG_PATH).toString();
+    }
+
+    /**
+     * Windows向けにensaaコマンドをセットアップする
+     */
+    private static void setupWindowsCommandAlias() {
+        if (!System.getProperty("os.name", "unknown").toLowerCase().contains("win")) {
+            return;
+        }
+
+        try {
+            String programDataPath = System.getenv(WINDOWS_PROGRAM_DATA_DIR);
+            if (programDataPath == null || programDataPath.isBlank()) {
+                programDataPath = WINDOWS_FALLBACK_PROGRAM_DATA_PATH;
+            }
+
+            Path commandDir = Paths.get(programDataPath, WINDOWS_COMMAND_DIR);
+            Files.createDirectories(commandDir);
+
+            Path launcher = resolveWindowsLauncherPath();
+            if (launcher == null) {
+                AgentLogger.warn("ensaaコマンドのセットアップをスキップしました: ランチャーが見つかりません");
+                return;
+            }
+
+            Path commandFile = commandDir.resolve(WINDOWS_COMMAND_FILE_NAME);
+            String commandContent = "@echo off\r\n\"" + launcher + "\" %*\r\n";
+            Files.writeString(commandFile, commandContent);
+            AgentLogger.info("Windowsコマンドラッパーを作成しました: " + commandFile);
+
+            if (appendPathIfMissing(commandDir.toString(), "Machine")) {
+                AgentLogger.info("ensaaコマンドディレクトリをシステムPATHへ追加しました");
+            } else if (appendPathIfMissing(commandDir.toString(), "User")) {
+                AgentLogger.info("ensaaコマンドディレクトリをユーザーPATHへ追加しました");
+            } else {
+                AgentLogger.warn("ensaaコマンドディレクトリのPATH追加に失敗しました");
+            }
+        } catch (Exception e) {
+            AgentLogger.warn("ensaaコマンドのセットアップに失敗しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Windows用ランチャー実行ファイルのパスを解決する
+     */
+    private static Path resolveWindowsLauncherPath() {
+        Path javaHome = Paths.get(System.getProperty("java.home", ".")).toAbsolutePath().normalize();
+        Path installDir = javaHome.getFileName() != null
+            && "runtime".equalsIgnoreCase(javaHome.getFileName().toString())
+            ? javaHome.getParent()
+            : javaHome;
+        if (installDir == null) {
+            return null;
+        }
+
+        List<Path> candidates = List.of(
+            installDir.resolve("EdamameAgent.exe"),
+            installDir.resolve("edamame-agent.exe"),
+            installDir.resolve("ensaa.exe")
+        );
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) {
+                return candidate.toAbsolutePath().normalize();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * PATHに対象ディレクトリが無い場合のみ追加する
+     */
+    private static boolean appendPathIfMissing(String directoryPath, String scope) {
+        String escapedPath = directoryPath.replace("'", "''");
+        String escapedScope = scope.replace("'", "''");
+        String script =
+            "$target='" + escapedPath + "'; " +
+            "$scope='" + escapedScope + "'; " +
+            "$current=[Environment]::GetEnvironmentVariable('Path',$scope); " +
+            "if ([string]::IsNullOrEmpty($current)) { $current='' }; " +
+            "$normalized=$current.ToLower(); " +
+            "if (-not $normalized.Contains($target.ToLower())) { " +
+            "  $newPath=($current.TrimEnd(';') + ';' + $target).Trim(';'); " +
+            "  [Environment]::SetEnvironmentVariable('Path',$newPath,$scope) " +
+            "}";
+
+        try {
+            Process process = new ProcessBuilder("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+                .redirectErrorStream(true)
+                .start();
+            int exitCode = process.waitFor();
+            return exitCode == 0;
+        } catch (Exception e) {
+            AgentLogger.debug("PATH更新に失敗しました(scope=" + scope + "): " + e.getMessage());
+            return false;
+        }
     }
 }
