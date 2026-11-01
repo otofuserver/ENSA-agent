@@ -25,6 +25,7 @@ dependencies {
 def mainClassName = 'com.edamame.agent.EdamameAgent'
 def releaseDir = layout.buildDirectory.dir('release')
 def linuxPackagingResourceDir = file('packaging/linux/jpackage')
+def windowsUpgradeUuid = '0d8fcf8e-6c95-4e4e-86fa-8fb4b3ab4f41'
 def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
 def isLinux = System.getProperty('os.name').toLowerCase().contains('linux')
 
@@ -98,6 +99,8 @@ tasks.register('packageExeInstaller', Exec) {
         '--type', 'exe',
         '--name', 'EdamameAgent',
         '--app-version', project.version.toString(),
+        '--win-upgrade-uuid', windowsUpgradeUuid,
+        '--win-dir-chooser',
         '--input', releaseDir.get().asFile.absolutePath,
         '--main-jar', 'EdamameAgent.jar',
         '--main-class', mainClassName,
