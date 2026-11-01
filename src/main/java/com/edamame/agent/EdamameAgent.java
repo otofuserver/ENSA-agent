@@ -520,20 +520,32 @@ public class EdamameAgent {
      *
      * @param defaultConfigPath 既定設定ファイルパス
      */
-    private static void printUsage(String defaultConfigPath) {
+    private static void printUsage(String defaultConfigPath, boolean isWindows) {
         System.out.println("使用方法: java -jar EdamameAgent-<version>.jar [オプション] [設定ファイルパス]");
+        System.out.println("");
+        System.out.println("共通オプション:");
         System.out.println("  -c, --config <path>   設定ファイルパスを指定");
         System.out.println("      --config=<path>   設定ファイルパスを指定");
         System.out.println("  -T, --test            設定書式チェックとエラー診断を実行して終了");
         System.out.println("  -R, --reload          実行中エージェントへ設定リロードを要求して終了");
-        System.out.println("      --service-install   Windowsサービスを登録（NSSM必須）");
-        System.out.println("      --service-uninstall Windowsサービス登録を解除");
-        System.out.println("      --service-start     Windowsサービスを起動");
-        System.out.println("      --service-stop      Windowsサービスを停止");
-        System.out.println("      --service-status    Windowsサービス状態を表示");
         System.out.println("  -v, --version         バージョンのみ表示");
         System.out.println("  -h, --help            このヘルプを表示");
         System.out.println("  [設定ファイルパス]     既存互換の位置引数（先頭1つ）");
+        System.out.println("");
+        if (isWindows) {
+            System.out.println("Windows専用オプション:");
+            System.out.println("      --service-install   Windowsサービスを登録（NSSM必須）");
+            System.out.println("      --service-uninstall Windowsサービス登録を解除");
+            System.out.println("      --service-start     Windowsサービスを起動");
+            System.out.println("      --service-stop      Windowsサービスを停止");
+            System.out.println("      --service-status    Windowsサービス状態を表示");
+        } else {
+            System.out.println("Linux運用:");
+            System.out.println("  サービス起動:   sudo systemctl start edamame-agent");
+            System.out.println("  サービス停止:   sudo systemctl stop edamame-agent");
+            System.out.println("  サービス状態:   sudo systemctl status edamame-agent");
+            System.out.println("  サービス再読込: sudo systemctl reload edamame-agent");
+        }
         System.out.println("既定設定ファイル: " + defaultConfigPath);
     }
 
@@ -746,12 +758,12 @@ public class EdamameAgent {
             return;
         }
         if (startupOptions.showHelp()) {
-            printUsage(defaultConfigPath);
+            printUsage(defaultConfigPath, isWindows);
             return;
         }
         if (startupOptions.errorMessage() != null) {
             System.err.println(startupOptions.errorMessage());
-            printUsage(defaultConfigPath);
+            printUsage(defaultConfigPath, isWindows);
             System.exit(1);
             return;
         }
