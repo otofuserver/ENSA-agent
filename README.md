@@ -45,6 +45,9 @@ sudo systemctl stop edamame-agent
 # 状態確認
 sudo systemctl status edamame-agent
 
+# 設定リロード（プロセス再起動なし）
+sudo systemctl reload edamame-agent
+
 # 自動起動を有効化する場合
 sudo systemctl enable edamame-agent
 ```

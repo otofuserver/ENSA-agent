@@ -74,6 +74,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=${LAUNCHER_PATH} --config ${CONFIG_FILE}
+ExecReload=/bin/sh -c 'touch /tmp/edamame-agent.reload'
 Restart=on-failure
 RestartSec=5
 

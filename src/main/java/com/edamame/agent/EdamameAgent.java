@@ -8,9 +8,11 @@ import com.edamame.agent.util.AgentLogger;
 import com.edamame.agent.util.AgentVersion;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,6 +32,7 @@ public class EdamameAgent {
     private static final String WINDOWS_PROGRAM_DATA_DIR = "ProgramData";
     private static final String WINDOWS_FALLBACK_PROGRAM_DATA_PATH = "C:\\ProgramData";
     private static final String WINDOWS_SYSTEM_CONFIG_PATH = "Edamame\\agent\\agent-config.json";
+    private static final String LINUX_RELOAD_COMMAND_PATH = "/tmp/edamame-agent.reload";
 
     private final AgentConfig config;
     private final ScheduledExecutorService executor;
@@ -37,9 +40,14 @@ public class EdamameAgent {
     private LogCollector logCollector;
     private LogTransmitter logTransmitter;
     private IptablesManager iptablesManager = null;
+    private ScheduledFuture<?> logCollectionTask;
+    private ScheduledFuture<?> iptablesTask;
+    private ScheduledFuture<?> heartbeatTask;
+    private ScheduledFuture<?> reloadCommandTask;
 
     private volatile boolean running = false;
     private String registrationId = null;
+    private long lastReloadCommandTimestamp = -1L;
 
     private record StartupOptions(String configPath, boolean showHelp, boolean showVersion, String errorMessage) {}
 
@@ -96,30 +104,8 @@ public class EdamameAgent {
 
             // 初期サーバー接続を試行（失敗時は再接続モードに移行）
             executor.schedule(this::initialServerConnection, 2, TimeUnit.SECONDS);
-
-            // ログ収集開始（10秒後に開始して初期接続処理と分離）
-            executor.scheduleWithFixedDelay(
-                this::collectAndTransmitLogs,
-                10,
-                config.getLogCollectionInterval(),
-                TimeUnit.SECONDS
-            );
-
-            // iptables管理開始（20秒後に開始してログ収集と確実に分離）
-            executor.scheduleWithFixedDelay(
-                this::manageIptables,
-                20,
-                config.getIptablesCheckInterval(),
-                TimeUnit.SECONDS
-            );
-
-            // ハートビート送信（30秒後に開始して他タスクと完全に分離）
-            executor.scheduleWithFixedDelay(
-                this::sendHeartbeat,
-                30,
-                config.getHeartbeatInterval(),
-                TimeUnit.SECONDS
-            );
+            initializeReloadCommandTimestamp();
+            schedulePeriodicTasks();
 
         } catch (Exception e) {
             AgentLogger.error("エージェント起動中にエラーが発生しました: " + e.getMessage());
@@ -164,9 +150,14 @@ public class EdamameAgent {
      */
     private void collectAndTransmitLogs() {
         try {
-            var logs = logCollector.collectNewLogs();
+            LogCollector collector = logCollector;
+            LogTransmitter transmitter = logTransmitter;
+            if (collector == null || transmitter == null) {
+                return;
+            }
+            var logs = collector.collectNewLogs();
             if (!logs.isEmpty()) {
-                boolean success = logTransmitter.transmitLogs(logs);
+                boolean success = transmitter.transmitLogs(logs);
                 if (success) {
                     AgentLogger.info(logs.size() + " 件のログエントリを転送しました");
                 } else {
@@ -183,7 +174,11 @@ public class EdamameAgent {
      */
     private void manageIptables() {
         try {
-            iptablesManager.processBlockRequests();
+            IptablesManager manager = iptablesManager;
+            if (manager == null) {
+                return;
+            }
+            manager.processBlockRequests();
         } catch (Exception e) {
             AgentLogger.error("iptables管理中にエラーが発生しました: " + e.getMessage());
         }
@@ -194,9 +189,68 @@ public class EdamameAgent {
      */
     private void sendHeartbeat() {
         try {
-            logTransmitter.sendHeartbeat();
+            LogTransmitter transmitter = logTransmitter;
+            if (transmitter == null) {
+                return;
+            }
+            transmitter.sendHeartbeat();
         } catch (Exception e) {
             AgentLogger.error("ハートビート送信中にエラーが発生しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 設定を再読み込みし、関連コンポーネントを再初期化する
+     *
+     * @return リロード成功の可否
+     */
+    public synchronized boolean reloadConfiguration() {
+        if (!running) {
+            AgentLogger.warn("エージェント停止中のため設定リロードをスキップしました");
+            return false;
+        }
+
+        AgentLogger.info("設定リロードを開始します");
+
+        if (!config.load()) {
+            AgentLogger.error("設定リロードに失敗しました: 設定ファイルの読み込みに失敗");
+            return false;
+        }
+
+        LogTransmitter previousTransmitter = logTransmitter;
+        String previousRegistrationId = registrationId;
+
+        cancelPeriodicTasks();
+
+        try {
+            logCollector = new LogCollector(config);
+            logTransmitter = new LogTransmitter(config);
+            iptablesManager = new IptablesManager(config, logTransmitter);
+            registrationId = null;
+
+            logTransmitter.setReconnectionSuccessCallback(() ->
+                AgentLogger.info("再接続が完了しました。新しいセッションで動作を継続します")
+            );
+
+            if (previousTransmitter != null && previousRegistrationId != null) {
+                previousTransmitter.unregisterServer(previousRegistrationId);
+            }
+
+            if (previousTransmitter != null) {
+                previousTransmitter.cleanup();
+            }
+
+            executor.schedule(this::initialServerConnection, 1, TimeUnit.SECONDS);
+            schedulePeriodicTasks();
+
+            AgentLogger.info("設定リロードが完了しました");
+            return true;
+        } catch (Exception e) {
+            AgentLogger.error("設定リロード中にエラーが発生しました: " + e.getMessage(), e);
+            if (previousTransmitter != null) {
+                logTransmitter = previousTransmitter;
+            }
+            return false;
         }
     }
 
@@ -212,18 +266,21 @@ public class EdamameAgent {
 
         try {
             // スケジュールされたタスクを停止
+            cancelPeriodicTasks();
             executor.shutdown();
             if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
                 executor.shutdownNow();
             }
 
             // サーバー登録を解除
-            if (registrationId != null) {
+            if (registrationId != null && logTransmitter != null) {
                 logTransmitter.unregisterServer(registrationId);
             }
 
             // LogTransmitterのクリーンアップ（再接続タスクとキューを含む）
-            logTransmitter.cleanup();
+            if (logTransmitter != null) {
+                logTransmitter.cleanup();
+            }
 
             AgentLogger.info("Edamameエージェントを停止しました");
 
@@ -240,6 +297,111 @@ public class EdamameAgent {
             AgentLogger.info("シャットダウンシグナルを受信しました");
             stop();
         }));
+    }
+
+    /**
+     * 定期タスクをスケジュールする
+     */
+    private void schedulePeriodicTasks() {
+        // ログ収集開始（10秒後に開始して初期接続処理と分離）
+        logCollectionTask = executor.scheduleWithFixedDelay(
+            this::collectAndTransmitLogs,
+            10,
+            config.getLogCollectionInterval(),
+            TimeUnit.SECONDS
+        );
+
+        // iptables管理開始（20秒後に開始してログ収集と確実に分離）
+        iptablesTask = executor.scheduleWithFixedDelay(
+            this::manageIptables,
+            20,
+            config.getIptablesCheckInterval(),
+            TimeUnit.SECONDS
+        );
+
+        // ハートビート送信（30秒後に開始して他タスクと完全に分離）
+        heartbeatTask = executor.scheduleWithFixedDelay(
+            this::sendHeartbeat,
+            30,
+            config.getHeartbeatInterval(),
+            TimeUnit.SECONDS
+        );
+
+        if (!isWindowsRuntime()) {
+            reloadCommandTask = executor.scheduleWithFixedDelay(
+                this::checkReloadCommand,
+                5,
+                5,
+                TimeUnit.SECONDS
+            );
+        }
+    }
+
+    /**
+     * 定期タスクを停止する
+     */
+    private void cancelPeriodicTasks() {
+        if (logCollectionTask != null) {
+            logCollectionTask.cancel(false);
+            logCollectionTask = null;
+        }
+        if (iptablesTask != null) {
+            iptablesTask.cancel(false);
+            iptablesTask = null;
+        }
+        if (heartbeatTask != null) {
+            heartbeatTask.cancel(false);
+            heartbeatTask = null;
+        }
+        if (reloadCommandTask != null) {
+            reloadCommandTask.cancel(false);
+            reloadCommandTask = null;
+        }
+    }
+
+    /**
+     * 設定リロードコマンドファイルの最終更新時刻を初期化する
+     */
+    private void initializeReloadCommandTimestamp() {
+        if (isWindowsRuntime()) {
+            return;
+        }
+        try {
+            Path reloadCommandPath = Paths.get(LINUX_RELOAD_COMMAND_PATH);
+            if (Files.exists(reloadCommandPath)) {
+                lastReloadCommandTimestamp = Files.getLastModifiedTime(reloadCommandPath).toMillis();
+            }
+        } catch (Exception e) {
+            AgentLogger.warn("設定リロードコマンド初期化に失敗しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 設定リロードコマンドを監視する
+     */
+    private void checkReloadCommand() {
+        try {
+            Path reloadCommandPath = Paths.get(LINUX_RELOAD_COMMAND_PATH);
+            if (!Files.exists(reloadCommandPath)) {
+                return;
+            }
+            long modifiedAt = Files.getLastModifiedTime(reloadCommandPath).toMillis();
+            if (modifiedAt <= lastReloadCommandTimestamp) {
+                return;
+            }
+            lastReloadCommandTimestamp = modifiedAt;
+            AgentLogger.info("設定リロードコマンドを検知しました");
+            reloadConfiguration();
+        } catch (Exception e) {
+            AgentLogger.warn("設定リロードコマンド監視でエラーが発生しました: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Windows実行環境か判定する
+     */
+    private boolean isWindowsRuntime() {
+        return System.getProperty("os.name", "unknown").toLowerCase().contains("win");
     }
 
     /**
