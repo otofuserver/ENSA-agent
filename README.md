@@ -84,8 +84,7 @@ ensaa --service-stop
 - `config\agent-config.json`（Linux向け）
 - `config\agent-config-windows.json`（Windows向け）
 
-※ セキュリティのため、`edamame.apiKey` は必ず `CHANGE_ME` から実運用キーへ変更してから起動してください。  
-※ 通信ペイロードは API キーで暗号化されます。
+※ セキュリティのため、`edamame.apiKey` は必ず `CHANGE_ME` から実運用キーへ変更してから起動してください。
 
 ## コマンド一覧（共通）
 ```bash

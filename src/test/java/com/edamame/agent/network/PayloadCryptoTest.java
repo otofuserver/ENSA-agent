@@ -24,9 +24,10 @@ class PayloadCryptoTest {
     }
 
     @Test
-    void decryptIfNeededShouldReturnPlainTextWhenNotEncrypted() throws Exception {
+    void decryptIfNeededShouldFailWhenPayloadIsNotEncrypted() {
         String plain = "{\"status\":\"ok\"}";
-        assertEquals(plain, PayloadCrypto.decryptIfNeeded(plain, "any-api-key"));
+        assertThrows(GeneralSecurityException.class,
+            () -> PayloadCrypto.decryptIfNeeded(plain, "any-api-key"));
     }
 
     @Test

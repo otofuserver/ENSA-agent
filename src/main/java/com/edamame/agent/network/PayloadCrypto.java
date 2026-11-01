@@ -52,16 +52,16 @@ public final class PayloadCrypto {
     }
 
     /**
-     * ENCv1形式の暗号文を復号する。平文の場合はそのまま返す。
+     * ENCv1形式の暗号文を復号する（暗号化必須）。
      *
-     * @param value 復号対象文字列（平文またはENCv1形式）
+     * @param value 復号対象文字列（ENCv1形式）
      * @param apiKey 鍵導出に使用するAPIキー
      * @return 復号済み平文
      * @throws GeneralSecurityException 復号に失敗した場合
      */
     public static String decryptIfNeeded(String value, String apiKey) throws GeneralSecurityException {
         if (value == null || !value.startsWith(ENVELOPE_PREFIX)) {
-            return value;
+            throw new GeneralSecurityException("暗号化されていないペイロードを受信しました");
         }
 
         SecretKeySpec keySpec = deriveKey(apiKey);
