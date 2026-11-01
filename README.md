@@ -81,6 +81,9 @@ ensaa --config /etc/Edamame/agent/agent-config.json
 # 設定書式チェック + エラー診断（統合コマンド）
 ensaa -T --config /etc/Edamame/agent/agent-config.json
 
+# 実行中エージェントへ設定リロード要求（Windows / Linux 共通）
+ensaa --reload
+
 # サービス状態確認
 sudo systemctl status edamame-agent
 
@@ -94,7 +97,7 @@ sudo systemctl reload edamame-agent
 sudo systemctl stop edamame-agent
 ```
 
-Windows でも同じく `ensaa -T` / `ensaa --help` を利用できます。
+Windows でも同じく `ensaa -T` / `ensaa --reload` / `ensaa --help` を利用できます。
 
 
 

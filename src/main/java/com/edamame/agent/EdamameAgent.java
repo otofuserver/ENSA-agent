@@ -34,6 +34,7 @@ public class EdamameAgent {
     private static final String WINDOWS_PROGRAM_DATA_DIR = "ProgramData";
     private static final String WINDOWS_FALLBACK_PROGRAM_DATA_PATH = "C:\\ProgramData";
     private static final String WINDOWS_SYSTEM_CONFIG_PATH = "Edamame\\agent\\agent-config.json";
+    private static final String WINDOWS_RELOAD_COMMAND_PATH = "Edamame\\agent\\reload.signal";
     private static final String WINDOWS_COMMAND_DIR = "Edamame\\agent\\bin";
     private static final String WINDOWS_COMMAND_FILE_NAME = "ensaa.cmd";
     private static final String LINUX_RELOAD_COMMAND_PATH = "/tmp/edamame-agent.reload";
@@ -55,7 +56,8 @@ public class EdamameAgent {
 
     private enum StartupCommand {
         START,
-        TEST
+        TEST,
+        RELOAD
     }
 
     private record StartupOptions(String configPath, StartupCommand command, boolean showHelp, boolean showVersion, String errorMessage) {}
@@ -336,14 +338,12 @@ public class EdamameAgent {
             TimeUnit.SECONDS
         );
 
-        if (!isWindowsRuntime()) {
-            reloadCommandTask = executor.scheduleWithFixedDelay(
-                this::checkReloadCommand,
-                5,
-                5,
-                TimeUnit.SECONDS
-            );
-        }
+        reloadCommandTask = executor.scheduleWithFixedDelay(
+            this::checkReloadCommand,
+            5,
+            5,
+            TimeUnit.SECONDS
+        );
     }
 
     /**
@@ -372,11 +372,8 @@ public class EdamameAgent {
      * 設定リロードコマンドファイルの最終更新時刻を初期化する
      */
     private void initializeReloadCommandTimestamp() {
-        if (isWindowsRuntime()) {
-            return;
-        }
         try {
-            Path reloadCommandPath = Paths.get(LINUX_RELOAD_COMMAND_PATH);
+            Path reloadCommandPath = resolveReloadCommandPath();
             if (Files.exists(reloadCommandPath)) {
                 lastReloadCommandTimestamp = Files.getLastModifiedTime(reloadCommandPath).toMillis();
             }
@@ -390,7 +387,7 @@ public class EdamameAgent {
      */
     private void checkReloadCommand() {
         try {
-            Path reloadCommandPath = Paths.get(LINUX_RELOAD_COMMAND_PATH);
+            Path reloadCommandPath = resolveReloadCommandPath();
             if (!Files.exists(reloadCommandPath)) {
                 return;
             }
@@ -411,6 +408,13 @@ public class EdamameAgent {
      */
     private boolean isWindowsRuntime() {
         return System.getProperty("os.name", "unknown").toLowerCase().contains("win");
+    }
+
+    /**
+     * 実行環境に応じたリロードコマンドファイルパスを返す
+     */
+    private Path resolveReloadCommandPath() {
+        return resolveReloadCommandPath(isWindowsRuntime());
     }
 
     /**
@@ -442,6 +446,10 @@ public class EdamameAgent {
 
             if ("-T".equals(arg) || "--test".equals(arg) || "--check-config".equals(arg) || "--check-errors".equals(arg)) {
                 command = StartupCommand.TEST;
+                continue;
+            }
+            if ("-R".equals(arg) || "--reload".equals(arg)) {
+                command = StartupCommand.RELOAD;
                 continue;
             }
 
@@ -488,6 +496,7 @@ public class EdamameAgent {
         System.out.println("  -c, --config <path>   設定ファイルパスを指定");
         System.out.println("      --config=<path>   設定ファイルパスを指定");
         System.out.println("  -T, --test            設定書式チェックとエラー診断を実行して終了");
+        System.out.println("  -R, --reload          実行中エージェントへ設定リロードを要求して終了");
         System.out.println("  -v, --version         バージョンのみ表示");
         System.out.println("  -h, --help            このヘルプを表示");
         System.out.println("  [設定ファイルパス]     既存互換の位置引数（先頭1つ）");
@@ -553,6 +562,25 @@ public class EdamameAgent {
     }
 
     /**
+     * 実行中エージェントへ設定リロードを要求する
+     */
+    private static boolean triggerReloadCommand(boolean isWindows) {
+        try {
+            Path reloadCommandPath = resolveReloadCommandPath(isWindows);
+            Path parent = reloadCommandPath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.writeString(reloadCommandPath, String.valueOf(System.currentTimeMillis()));
+            AgentLogger.info("設定リロード要求を送信しました: " + reloadCommandPath);
+            return true;
+        } catch (Exception e) {
+            AgentLogger.error("設定リロード要求の送信に失敗しました: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * メインエントリーポイント
      */
     public static void main(String[] args) {
@@ -590,6 +618,11 @@ public class EdamameAgent {
             System.exit(ok ? 0 : 1);
             return;
         }
+        if (startupOptions.command() == StartupCommand.RELOAD) {
+            boolean ok = triggerReloadCommand(isWindows);
+            System.exit(ok ? 0 : 1);
+            return;
+        }
         String resolvedConfigPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
 
         AgentLogger.info("Edamame Agent v" + AGENT_VERSION + " を開始しています...");
@@ -621,6 +654,20 @@ public class EdamameAgent {
             programDataPath = WINDOWS_FALLBACK_PROGRAM_DATA_PATH;
         }
         return Paths.get(programDataPath, WINDOWS_SYSTEM_CONFIG_PATH).toString();
+    }
+
+    /**
+     * OSに応じたリロードコマンドファイルパスを解決する
+     */
+    private static Path resolveReloadCommandPath(boolean isWindows) {
+        if (isWindows) {
+            String programDataPath = System.getenv(WINDOWS_PROGRAM_DATA_DIR);
+            if (programDataPath == null || programDataPath.isBlank()) {
+                programDataPath = WINDOWS_FALLBACK_PROGRAM_DATA_PATH;
+            }
+            return Paths.get(programDataPath, WINDOWS_RELOAD_COMMAND_PATH).toAbsolutePath().normalize();
+        }
+        return Paths.get(LINUX_RELOAD_COMMAND_PATH).toAbsolutePath().normalize();
     }
 
     /**
