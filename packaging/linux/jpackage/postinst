@@ -4,6 +4,7 @@ set -eu
 CONFIG_DIR="/etc/Edamame/agent"
 CONFIG_FILE="${CONFIG_DIR}/agent-config.json"
 SERVICE_FILE="/etc/systemd/system/edamame-agent.service"
+ENSAA_WRAPPER="/usr/local/bin/ensaa"
 
 mkdir -p "${CONFIG_DIR}"
 chmod 755 "${CONFIG_DIR}"
@@ -53,17 +54,24 @@ EOF
   chmod 600 "${CONFIG_FILE}"
 fi
 
+LAUNCHER_PATH=""
+if command -v edamame-agent >/dev/null 2>&1; then
+  LAUNCHER_PATH="$(command -v edamame-agent)"
+elif [ -x "/opt/edamame-agent/bin/edamame-agent" ]; then
+  LAUNCHER_PATH="/opt/edamame-agent/bin/edamame-agent"
+elif [ -x "/opt/edamame-agent/bin/EdamameAgent" ]; then
+  LAUNCHER_PATH="/opt/edamame-agent/bin/EdamameAgent"
+else
+  LAUNCHER_PATH="edamame-agent"
+fi
+
+cat <<EOF > "${ENSAA_WRAPPER}"
+#!/bin/sh
+exec "${LAUNCHER_PATH}" "\$@"
+EOF
+chmod 755 "${ENSAA_WRAPPER}"
+
 if command -v systemctl >/dev/null 2>&1; then
-  LAUNCHER_PATH=""
-  if command -v edamame-agent >/dev/null 2>&1; then
-    LAUNCHER_PATH="$(command -v edamame-agent)"
-  elif [ -x "/opt/edamame-agent/bin/edamame-agent" ]; then
-    LAUNCHER_PATH="/opt/edamame-agent/bin/edamame-agent"
-  elif [ -x "/opt/edamame-agent/bin/EdamameAgent" ]; then
-    LAUNCHER_PATH="/opt/edamame-agent/bin/EdamameAgent"
-  else
-    LAUNCHER_PATH="edamame-agent"
-  fi
 
   cat <<EOF > "${SERVICE_FILE}"
 [Unit]

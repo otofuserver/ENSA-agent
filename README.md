@@ -26,6 +26,9 @@ sudo systemctl status edamame-agent
 
 # 3) 設定ファイルを編集
 sudo nano /etc/Edamame/agent/agent-config.json
+
+# 4) CLIコマンド確認
+ensaa --help
 ```
 
 ### Windows版インストール（.exe）
@@ -62,13 +65,32 @@ sudo systemctl enable edamame-agent
 - `config\agent-config.json`（Linux向け）
 - `config\agent-config-windows.json`（Windows向け）
 
-## コマンドリンク
-- [コマンド一覧（準備中）](#コマンド一覧)
 
 ## コマンド一覧
 ```bash
+# バージョン表示
+ensaa --version
+
+# ヘルプ表示
+ensaa --help
+
+# 設定ファイルを指定して通常起動
+ensaa --config /etc/Edamame/agent/agent-config.json
+
 # 設定書式チェック + エラー診断（統合コマンド）
-java -jar EdamameAgent.jar -T --config /etc/Edamame/agent/agent-config.json
+ensaa -T --config /etc/Edamame/agent/agent-config.json
+
+# サービス状態確認
+sudo systemctl status edamame-agent
+
+# サービス起動
+sudo systemctl start edamame-agent
+
+# 設定リロード（プロセス再起動なし）
+sudo systemctl reload edamame-agent
+
+# サービス停止
+sudo systemctl stop edamame-agent
 ```
 
 
