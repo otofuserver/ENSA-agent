@@ -10,6 +10,8 @@ import com.edamame.agent.util.AgentVersion;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -49,7 +51,12 @@ public class EdamameAgent {
     private String registrationId = null;
     private long lastReloadCommandTimestamp = -1L;
 
-    private record StartupOptions(String configPath, boolean showHelp, boolean showVersion, String errorMessage) {}
+    private enum StartupCommand {
+        START,
+        TEST
+    }
+
+    private record StartupOptions(String configPath, StartupCommand command, boolean showHelp, boolean showVersion, String errorMessage) {}
 
     /**
      * エージェントインスタンスを初期化
@@ -418,25 +425,31 @@ public class EdamameAgent {
      */
     private static StartupOptions parseStartupOptions(String[] args) {
         String configPath = null;
+        StartupCommand command = StartupCommand.START;
 
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
 
             if ("-h".equals(arg) || "--help".equals(arg)) {
-                return new StartupOptions(null, true, false, null);
+                return new StartupOptions(null, command, true, false, null);
             }
 
             if ("-v".equals(arg) || "--version".equals(arg)) {
-                return new StartupOptions(null, false, true, null);
+                return new StartupOptions(null, command, false, true, null);
+            }
+
+            if ("-T".equals(arg) || "--test".equals(arg) || "--check-config".equals(arg) || "--check-errors".equals(arg)) {
+                command = StartupCommand.TEST;
+                continue;
             }
 
             if ("-c".equals(arg) || "--config".equals(arg)) {
                 if (i + 1 >= args.length) {
-                    return new StartupOptions(null, false, false, "起動オプションエラー: " + arg + " に設定ファイルパスが指定されていません");
+                    return new StartupOptions(null, command, false, false, "起動オプションエラー: " + arg + " に設定ファイルパスが指定されていません");
                 }
                 String optionValue = args[++i].trim();
                 if (optionValue.isEmpty()) {
-                    return new StartupOptions(null, false, false, "起動オプションエラー: " + arg + " の設定ファイルパスが空です");
+                    return new StartupOptions(null, command, false, false, "起動オプションエラー: " + arg + " の設定ファイルパスが空です");
                 }
                 configPath = optionValue;
                 continue;
@@ -445,7 +458,7 @@ public class EdamameAgent {
             if (arg.startsWith("--config=")) {
                 String optionValue = arg.substring("--config=".length()).trim();
                 if (optionValue.isEmpty()) {
-                    return new StartupOptions(null, false, false, "起動オプションエラー: --config= の設定ファイルパスが空です");
+                    return new StartupOptions(null, command, false, false, "起動オプションエラー: --config= の設定ファイルパスが空です");
                 }
                 configPath = optionValue;
                 continue;
@@ -457,10 +470,10 @@ public class EdamameAgent {
                 continue;
             }
 
-            return new StartupOptions(null, false, false, "起動オプションエラー: 未対応の引数です: " + arg);
+            return new StartupOptions(null, command, false, false, "起動オプションエラー: 未対応の引数です: " + arg);
         }
 
-        return new StartupOptions(configPath, false, false, null);
+        return new StartupOptions(configPath, command, false, false, null);
     }
 
     /**
@@ -472,10 +485,69 @@ public class EdamameAgent {
         System.out.println("使用方法: java -jar EdamameAgent-<version>.jar [オプション] [設定ファイルパス]");
         System.out.println("  -c, --config <path>   設定ファイルパスを指定");
         System.out.println("      --config=<path>   設定ファイルパスを指定");
+        System.out.println("  -T, --test            設定書式チェックとエラー診断を実行して終了");
         System.out.println("  -v, --version         バージョンのみ表示");
         System.out.println("  -h, --help            このヘルプを表示");
         System.out.println("  [設定ファイルパス]     既存互換の位置引数（先頭1つ）");
         System.out.println("既定設定ファイル: " + defaultConfigPath);
+    }
+
+    /**
+     * 設定ファイル書式をチェックする
+     */
+    private static boolean checkConfigFormat(String configPath) {
+        AgentLogger.info("設定書式チェックを開始します: " + configPath);
+        AgentConfig config = new AgentConfig(configPath);
+        boolean valid = config.validateConfigFormat();
+        if (valid) {
+            AgentLogger.info("設定書式チェック結果: OK");
+            return true;
+        }
+        AgentLogger.error("設定書式チェック結果: NG");
+        return false;
+    }
+
+    /**
+     * 設定および接続のエラー診断を実行する
+     */
+    private static boolean checkErrors(String configPath) {
+        AgentLogger.info("エラー診断を開始します: " + configPath);
+        AgentConfig config = new AgentConfig(configPath);
+        List<String> diagnostics = new ArrayList<>();
+
+        if (!config.load()) {
+            diagnostics.add("設定読み込みエラー: 設定内容を適用できません");
+        } else {
+            if (config.getNginxLogPaths().isEmpty()) {
+                diagnostics.add("設定エラー: logging.servers が空です");
+            }
+            if (config.getApiKey() == null || config.getApiKey().isBlank()) {
+                diagnostics.add("設定エラー: edamame.apiKey が空です");
+            }
+            if (!config.testTcpConnection()) {
+                diagnostics.add("接続エラー: Edamameサーバーへ接続できません");
+            }
+        }
+
+        if (diagnostics.isEmpty()) {
+            AgentLogger.info("エラー診断結果: 問題は検出されませんでした");
+            return true;
+        }
+
+        AgentLogger.error("エラー診断結果: " + diagnostics.size() + " 件の問題を検出しました");
+        for (String diagnostic : diagnostics) {
+            AgentLogger.error(" - " + diagnostic);
+        }
+        return false;
+    }
+
+    /**
+     * 設定書式チェックとエラー診断を連続実行する
+     */
+    private static boolean runTestCommand(String configPath) {
+        boolean formatOk = checkConfigFormat(configPath);
+        boolean diagnosticsOk = checkErrors(configPath);
+        return formatOk && diagnosticsOk;
     }
 
     /**
@@ -507,6 +579,11 @@ public class EdamameAgent {
         String configPath = startupOptions.configPath();
         if (configPath == null || configPath.trim().isEmpty()) {
             configPath = defaultConfigPath;
+        }
+        if (startupOptions.command() == StartupCommand.TEST) {
+            boolean ok = runTestCommand(configPath);
+            System.exit(ok ? 0 : 1);
+            return;
         }
         String resolvedConfigPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
 

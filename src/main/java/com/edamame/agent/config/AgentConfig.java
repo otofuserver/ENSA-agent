@@ -120,6 +120,49 @@ public class AgentConfig {
     }
 
     /**
+     * 設定ファイルの書式を検証する
+     *
+     * @return 検証成功時true
+     */
+    public boolean validateConfigFormat() {
+        try {
+            Path resolvedPath = Paths.get(configPath).toAbsolutePath().normalize();
+            if (!Files.exists(resolvedPath)) {
+                AgentLogger.error("設定ファイルが見つかりません: " + resolvedPath);
+                return false;
+            }
+
+            String jsonContent = Files.readString(resolvedPath);
+            JsonNode root = objectMapper.readTree(jsonContent);
+
+            if (!root.has("agent") || !root.get("agent").isObject()) {
+                AgentLogger.error("設定書式エラー: agent セクションがありません");
+                return false;
+            }
+            if (!root.has("edamame") || !root.get("edamame").isObject()) {
+                AgentLogger.error("設定書式エラー: edamame セクションがありません");
+                return false;
+            }
+            if (!root.has("logging") || !root.get("logging").isObject()) {
+                AgentLogger.error("設定書式エラー: logging セクションがありません");
+                return false;
+            }
+
+            JsonNode servers = root.path("logging").path("servers");
+            if (!servers.isArray()) {
+                AgentLogger.error("設定書式エラー: logging.servers は配列で指定してください");
+                return false;
+            }
+
+            AgentLogger.info("設定ファイル書式チェックに成功しました: " + resolvedPath);
+            return true;
+        } catch (Exception e) {
+            AgentLogger.error("設定ファイル書式チェックに失敗しました: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
      * エージェント設定を読み込み
      */
     private void loadAgentConfig(JsonNode root) {

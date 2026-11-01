@@ -65,6 +65,12 @@ sudo systemctl enable edamame-agent
 ## コマンドリンク
 - [コマンド一覧（準備中）](#コマンド一覧)
 
+## コマンド一覧
+```bash
+# 設定書式チェック + エラー診断（統合コマンド）
+java -jar EdamameAgent.jar -T --config /etc/Edamame/agent/agent-config.json
+```
+
 
 
 
