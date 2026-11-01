@@ -125,6 +125,13 @@ jobs:
         with:
           path: release-assets
 
+      - name: Generate release notes from CHANGELOG
+        run: |
+          chmod +x .github/scripts/extract-release-notes.sh
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          .github/scripts/extract-release-notes.sh "$VERSION" RELEASE_NOTES.md
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -134,4 +141,4 @@ jobs:
             release-assets/deb-installer/*.deb \
             release-assets/exe-installer/*.exe \
             --verify-tag \
-            --generate-notes
+            --notes-file RELEASE_NOTES.md
