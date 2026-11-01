@@ -48,8 +48,7 @@ public class AgentConfig {
     private String edamameHost = "localhost";
     private int edamamePort = 2591;                // Agent専用ポート
     private String protocol = "tcp";               // TCP通信
-    private String apiKey = "edamame-agent-api-key-2025";
-    private boolean useSSL = false;
+    private String apiKey = "CHANGE_ME";
     private int connectionTimeout = 30;
     private boolean socketKeepAlive = true;
 
@@ -196,7 +195,6 @@ public class AgentConfig {
             edamamePort = edamameNode.path("port").asInt(edamamePort);
             protocol = edamameNode.path("protocol").asText(protocol);
             apiKey = edamameNode.path("apiKey").asText(apiKey);
-            useSSL = edamameNode.path("useSSL").asBoolean(useSSL);
             connectionTimeout = edamameNode.path("connectionTimeout").asInt(connectionTimeout);
             socketKeepAlive = edamameNode.path("socketKeepAlive").asBoolean(socketKeepAlive);
         }
@@ -508,9 +506,8 @@ public class AgentConfig {
             "host": "localhost",
             "port": 2591,
             "protocol": "tcp",
-            "apiKey": "edamame-agent-api-key-2025",
-            "useSSL": false,
-            "description": "Edamame Security Analyzer Container - TCP Communication",
+            "apiKey": "CHANGE_ME",
+            "description": "Edamame Security Analyzer Container - TCP with API-key payload encryption",
             "connectionTimeout": 30,
             "socketKeepAlive": true
           },
@@ -555,9 +552,8 @@ public class AgentConfig {
             "host": "localhost",
             "port": 2591,
             "protocol": "tcp",
-            "apiKey": "edamame-agent-api-key-2025",
-            "useSSL": false,
-            "description": "Edamame Security Analyzer Container - TCP Communication",
+            "apiKey": "CHANGE_ME",
+            "description": "Edamame Security Analyzer Container - TCP with API-key payload encryption",
             "connectionTimeout": 30,
             "socketKeepAlive": true
           },

@@ -38,8 +38,8 @@ public final class TcpProtocolConstants {
     public static final byte RESPONSE_ERROR = 0x01;
     public static final byte RESPONSE_AUTH_FAILED = 0x02;
 
-    // 有効なAPIキー（実際の運用では外部設定から読み込み）
-    public static final String VALID_API_KEY = "edamame-agent-api-key-2025";
+    // 互換用プレースホルダ（実運用では必ず設定ファイルから読み込むこと）
+    public static final String VALID_API_KEY = "CHANGE_ME";
 
     // 通信制限設定
     public static final int SOCKET_TIMEOUT = 30000; // 30秒

@@ -20,9 +20,8 @@ if [ ! -f "${CONFIG_FILE}" ]; then
     "host": "localhost",
     "port": 2591,
     "protocol": "tcp",
-    "apiKey": "edamame-agent-api-key-2025",
-    "useSSL": false,
-    "description": "Edamame Security Analyzer Container - TCP Communication",
+    "apiKey": "CHANGE_ME",
+    "description": "Edamame Security Analyzer Container - TCP with API-key payload encryption",
     "connectionTimeout": 30,
     "socketKeepAlive": true
   },

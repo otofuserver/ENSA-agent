@@ -11,6 +11,7 @@ import static com.edamame.agent.network.TcpProtocolConstants.*;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
@@ -373,10 +374,11 @@ public class LogTransmitter {
             // APIキーとエージェント名を準備
             String apiKey = config.getApiKey();
             String agentName = config.getAgentId();
+            String protectedAgentName = protectPayload(agentName);
 
             // データ長を計算（APIキー長 + APIキー + エージェント名長 + エージェント名）
             byte[] apiKeyBytes = apiKey.getBytes(StandardCharsets.UTF_8);
-            byte[] agentNameBytes = agentName.getBytes(StandardCharsets.UTF_8);
+            byte[] agentNameBytes = protectedAgentName.getBytes(StandardCharsets.UTF_8);
             int totalDataLength = 4 + apiKeyBytes.length + 4 + agentNameBytes.length; // 長さフィールド込み
 
             // 認証メッセージを送信
@@ -731,10 +733,11 @@ public class LogTransmitter {
             registrationData.put("timestamp", System.currentTimeMillis());
 
             String jsonData = objectMapper.writeValueAsString(registrationData);
+            String protectedJsonData = protectPayload(jsonData);
 
             // データ長を計算（APIキー長 + APIキー + JSON長 + JSON）
             byte[] apiKeyBytes = apiKey.getBytes(StandardCharsets.UTF_8);
-            byte[] jsonBytes = jsonData.getBytes(StandardCharsets.UTF_8);
+            byte[] jsonBytes = protectedJsonData.getBytes(StandardCharsets.UTF_8);
             int totalDataLength = 4 + apiKeyBytes.length + 4 + jsonBytes.length;
 
             // サーバー登録メッセージを送信（プロトコル統一）
@@ -807,7 +810,8 @@ public class LogTransmitter {
      * 文字列を書き込み
      */
     private void writeString(String str) throws IOException {
-        byte[] bytes = str.getBytes(StandardCharsets.UTF_8);
+        String encryptedPayload = protectPayload(str);
+        byte[] bytes = encryptedPayload.getBytes(StandardCharsets.UTF_8);
         out.writeInt(bytes.length);
         out.write(bytes);
     }
@@ -822,7 +826,23 @@ public class LogTransmitter {
         }
         byte[] bytes = new byte[length];
         in.readFully(bytes);
-        return new String(bytes, StandardCharsets.UTF_8);
+        String rawValue = new String(bytes, StandardCharsets.UTF_8);
+        try {
+            return PayloadCrypto.decryptIfNeeded(rawValue, config.getApiKey());
+        } catch (GeneralSecurityException e) {
+            throw new IOException("レスポンスの復号に失敗しました", e);
+        }
+    }
+
+    /**
+     * ペイロードをAPIキーで暗号化する
+     */
+    private String protectPayload(String plainText) throws IOException {
+        try {
+            return PayloadCrypto.encryptToEnvelope(plainText, config.getApiKey());
+        } catch (GeneralSecurityException e) {
+            throw new IOException("ペイロード暗号化に失敗しました", e);
+        }
     }
 
     /**

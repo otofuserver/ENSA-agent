@@ -8,7 +8,6 @@ NGINXログを収集し、Edamameサーバーへ送信するセキュリティ�
 - iptablesブロック: ブロック要求を受信し、iptables / ip6tables へ反映
 - ModSecurity連携: ModSecurityの検知ログを収集し、関連リクエストをサーバー側分析に連携
 
-
 ## 動作環境（使用のみ）
 - Java 17 / 21 / 25（17以上）
 - Linux / Windows
@@ -85,6 +84,8 @@ ensaa --service-stop
 - `config\agent-config.json`（Linux向け）
 - `config\agent-config-windows.json`（Windows向け）
 
+※ セキュリティのため、`edamame.apiKey` は必ず `CHANGE_ME` から実運用キーへ変更してから起動してください。  
+※ 通信ペイロードは API キーで暗号化されます。
 
 ## コマンド一覧（共通）
 ```bash
@@ -137,10 +138,7 @@ sudo systemctl reload edamame-agent
 sudo systemctl stop edamame-agent
 ```
 
-
-
-
-
+Windows でも同じく `ensaa -T` / `ensaa --reload` / `ensaa --help` を利用できます。
 
 ## 自分でbuildしたい人向けの情報
 
