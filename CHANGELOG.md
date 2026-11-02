@@ -2,6 +2,12 @@
 
 このプロジェクトの主な変更はこのファイルで管理します。
 
+## [Unreleased]
+
+### Fixed
+- Java 25 実行環境で `Unsupported class file major version 69` が発生する問題を修正（Gradle Wrapper を 9.1.0 へ更新）
+- Gradle 9 系移行に伴うテスト実行不整合を修正（`junit-platform-launcher` を test runtime に追加）
+
 ## [1.1.0] - 2026-11-02
 
 ### Added
@@ -18,4 +24,3 @@
 ### Fixed
 - リリースアーティファクト構成を整理し、重複しやすい source 配布導線を見直し
 - パッケージ版数と `build.gradle` の version の不一致が起きないよう統一
-
