@@ -230,7 +230,7 @@ public class LogTransmitter {
      * キューに溜まったデータを処理
      */
     private synchronized void processQueuedData() {
-        AgentLogger.info("キューに溜まったデータの送信を開始します");
+        AgentLogger.info("再接続キュー送信を開始します（キューサイズ: " + logQueue.size() + " 件）");
 
         // ログキューは大量時の負荷を抑えるため、小分けで段階的に送信する
         int drainBatchSize = resolveSendBatchSize();
@@ -276,7 +276,7 @@ public class LogTransmitter {
 
         // 残りのキューサイズを報告
         if (!logQueue.isEmpty()) {
-            AgentLogger.info("ログキューに " + logQueue.size() + " 件のデータが残っています");
+            AgentLogger.info("再接続キュー送信終了: 残キュー " + logQueue.size() + " 件");
         } else {
             AgentLogger.info("再接続キュー送信が完了しました（累計 " + totalSent + " 件）");
         }
